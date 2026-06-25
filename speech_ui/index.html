@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: transparent;
+      padding: 8px 0;
+    }
+    .row {
+      display: flex;
+      gap: 8px;
+      align-items: flex-start;
+    }
+    .btn {
+      padding: 6px 14px;
+      border-radius: 6px;
+      border: none;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .btn-start  { background: #238636; color: #fff; }
+    .btn-stop   { background: #b91c1c; color: #fff; }
+    .btn-copy   { background: #1f6feb; color: #fff; }
+    .btn-copy:disabled { background: #21262d; color: #8b949e; cursor: not-allowed; }
+    .text-box {
+      flex: 1;
+      min-height: 36px;
+      padding: 7px 10px;
+      background: #21262d;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      color: #e6edf3;
+      font-size: 13px;
+      line-height: 1.4;
+      outline: none;
+      resize: none;
+    }
+    .status {
+      font-size: 11px;
+      color: #8b949e;
+      margin-top: 5px;
+      min-height: 16px;
+    }
+    .live { color: #3fb950; }
+    .dot {
+      display: inline-block;
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: #3fb950;
+      margin-right: 4px;
+      animation: blink 1.2s infinite;
+    }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+  </style>
+</head>
+<body>
+  <div class="row">
+    <button class="btn btn-start" id="recBtn">🎤 録音開始</button>
+    <textarea class="text-box" id="textBox" rows="2" placeholder="ここに認識されたテキストが表示されます..."></textarea>
+    <button class="btn btn-copy" id="copyBtn" disabled>📋 コピー</button>
+  </div>
+  <div class="status" id="status">① 録音開始 → ② 話す → ③ コピー → ④ 上の欄に貼り付けてEnter</div>
+
+  <script>
+    const recBtn  = document.getElementById('recBtn');
+    const copyBtn = document.getElementById('copyBtn');
+    const textBox = document.getElementById('textBox');
+    const status  = document.getElementById('status');
+
+    let recognition = null;
+    let finalText = '';
+    let isRecording = false;
+
+    // ── 録音開始/停止 ──
+    recBtn.addEventListener('click', () => {
+      if (!isRecording) {
+        startRecording();
+      } else {
+        stopRecording();
+      }
+    });
+
+    function startRecording() {
+      if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+        status.textContent = '⚠️ このブラウザは音声認識に対応していません（Chromeを使ってください）';
+        return;
+      }
+
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognition = new SpeechRecognition();
+      recognition.lang = 'ja-JP';
+      recognition.continuous = true;
+      recognition.interimResults = true;
+
+      finalText = '';
+      textBox.value = '';
+      addBtn.disabled = true;
+
+      recognition.onstart = () => {
+        isRecording = true;
+        recBtn.textContent = '⏹ 停止';
+        recBtn.className = 'btn btn-stop';
+        status.innerHTML = '<span class="dot"></span><span class="live">認識中...</span>';
+      };
+
+      recognition.onresult = (event) => {
+        let interimText = '';
+        finalText = '';
+        for (let i = 0; i < event.results.length; i++) {
+          if (event.results[i].isFinal) {
+            finalText += event.results[i][0].transcript;
+          } else {
+            interimText += event.results[i][0].transcript;
+          }
+        }
+        textBox.value = finalText + interimText;
+        copyBtn.disabled = !finalText.trim();
+      };
+
+      recognition.onerror = (event) => {
+        status.textContent = `エラー: ${event.error}`;
+        stopRecording();
+      };
+
+      recognition.onend = () => {
+        if (isRecording) {
+          // 継続モードが途切れた場合は再開
+          recognition.start();
+        }
+      };
+
+      recognition.start();
+    }
+
+    function stopRecording() {
+      isRecording = false;
+      if (recognition) {
+        recognition.onend = null;
+        recognition.stop();
+        recognition = null;
+      }
+      recBtn.textContent = '🎤 録音開始';
+      recBtn.className = 'btn btn-start';
+      status.textContent = '停止しました';
+      copyBtn.disabled = !textBox.value.trim();
+    }
+
+    // ── 「コピー」ボタン：クリップボードにコピー ──
+    copyBtn.addEventListener('click', () => {
+      const text = textBox.value.trim();
+      if (text) {
+        navigator.clipboard.writeText(text).then(() => {
+          status.textContent = '✓ コピーしました。上の欄に貼り付けてEnterを押してください';
+          copyBtn.textContent = '✓ コピー済み';
+          setTimeout(() => {
+            copyBtn.textContent = '📋 コピー';
+            status.innerHTML = isRecording
+              ? '<span class="dot"></span><span class="live">認識中...</span>'
+              : '① 録音開始 → ② 話す → ③ コピー → ④ 上の欄に貼り付けてEnter';
+          }, 2000);
+        });
+      }
+    });
+
+    // ── テキストボックスの手動編集も許可 ──
+    textBox.addEventListener('input', () => {
+      copyBtn.disabled = !textBox.value.trim();
+    });
+  </script>
+</body>
+</html>
