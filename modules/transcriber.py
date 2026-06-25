@@ -15,9 +15,15 @@ from pathlib import Path
 from typing import Callable, List, Optional
 
 import numpy as np
-import sounddevice as sd
 import soundfile as sf
 from dotenv import load_dotenv
+
+try:
+    import sounddevice as sd
+    SOUNDDEVICE_AVAILABLE = True
+except Exception:
+    sd = None
+    SOUNDDEVICE_AVAILABLE = False
 from openai import OpenAI
 
 load_dotenv()
@@ -106,6 +112,8 @@ class RealtimeTranscriber:
 
     def _record_loop(self) -> None:
         """一定秒数ごとに録音してキューに積む"""
+        if not SOUNDDEVICE_AVAILABLE:
+            return
         while self._running:
             frames = int(SAMPLE_RATE * self.chunk_seconds)
             audio = sd.rec(
