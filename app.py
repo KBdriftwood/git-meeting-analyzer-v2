@@ -490,34 +490,27 @@ with col_center:
         )
         audio_val = st.audio_input("録音", label_visibility="collapsed", key="audio_rec")
         if audio_val:
-            try:
-                import whisper, io, numpy as np
-                import soundfile as sf
-
-                # 層1: tiny モデルで高速文字起こし（約3秒）
-                with st.spinner("文字起こし中..."):
+            with st.spinner("文字起こし中..."):
+                try:
+                    import io
+                    from openai import OpenAI
+                    client = OpenAI(api_key=_os.getenv("OPENAI_API_KEY"))
                     audio_bytes = io.BytesIO(audio_val.read())
-                    audio_np, sample_rate = sf.read(audio_bytes, dtype="float32")
-                    if audio_np.ndim > 1:
-                        audio_np = audio_np.mean(axis=1)
-                    if sample_rate != 16000:
-                        new_len = int(len(audio_np) * 16000 / sample_rate)
-                        audio_np = np.interp(
-                            np.linspace(0, len(audio_np) - 1, new_len),
-                            np.arange(len(audio_np)), audio_np,
-                        ).astype(np.float32)
-                    model = whisper.load_model("small")
-                    result = model.transcribe(audio_np, language="ja")
-                    recognized = result["text"].strip()
-
-                if recognized:
-                    # 層2: まず即表示 → 分析はキューで後追い
-                    add_utterance("発言者", recognized, auto_analyze=True)
-                    st.rerun()  # ← 文字起こし結果を即座に画面に反映
-                else:
-                    st.warning("音声を認識できませんでした。もう一度お試しください。")
-            except ImportError:
-                st.warning("pip3 install openai-whisper を実行してください")
+                    audio_bytes.name = "audio.wav"
+                    result = client.audio.transcriptions.create(
+                        model="whisper-1",
+                        file=audio_bytes,
+                        language="ja",
+                        response_format="text",
+                    )
+                    recognized = result.strip() if isinstance(result, str) else ""
+                    if recognized:
+                        add_utterance("発言者", recognized, auto_analyze=True)
+                        st.rerun()
+                    else:
+                        st.warning("音声を認識できませんでした。もう一度お試しください。")
+                except Exception as e:
+                    st.error(f"文字起こしエラー: {e}")
 
     # ── 発言入力（テキストモード） ──
     with st.expander("発言を追加（テキスト入力）", expanded=not bool(st.session_state.utterances)):
