@@ -492,18 +492,24 @@ with col_center:
         if audio_val:
             with st.spinner("文字起こし中..."):
                 try:
-                    import io
+                    import io, tempfile, os as _tmpos
                     from openai import OpenAI
                     client = OpenAI(api_key=_os.getenv("OPENAI_API_KEY"))
-                    audio_bytes = io.BytesIO(audio_val.read())
-                    audio_bytes.name = "audio.wav"
-                    result = client.audio.transcriptions.create(
-                        model="whisper-1",
-                        file=audio_bytes,
-                        language="ja",
-                        response_format="text",
-                    )
-                    recognized = result.strip() if isinstance(result, str) else ""
+                    audio_data = audio_val.read()
+                    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+                        tmp.write(audio_data)
+                        tmp_path = tmp.name
+                    try:
+                        with open(tmp_path, "rb") as f:
+                            result = client.audio.transcriptions.create(
+                                model="whisper-1",
+                                file=f,
+                                language="ja",
+                                response_format="text",
+                            )
+                        recognized = result.strip() if isinstance(result, str) else ""
+                    finally:
+                        _tmpos.unlink(tmp_path)
                     if recognized:
                         add_utterance("発言者", recognized, auto_analyze=True)
                         st.rerun()
