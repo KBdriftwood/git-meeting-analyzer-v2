@@ -493,16 +493,16 @@ with col_center:
             with st.spinner("文字起こし中..."):
                 try:
                     import io, tempfile, os as _tmpos
-                    from openai import OpenAI
-                    client = OpenAI(api_key=_os.getenv("OPENAI_API_KEY"))
+                    from groq import Groq
+                    groq_client = Groq(api_key=_os.getenv("GROQ_API_KEY"))
                     audio_data = audio_val.read()
                     with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
                         tmp.write(audio_data)
                         tmp_path = tmp.name
                     try:
                         with open(tmp_path, "rb") as f:
-                            result = client.audio.transcriptions.create(
-                                model="whisper-1",
+                            result = groq_client.audio.transcriptions.create(
+                                model="whisper-large-v3-turbo",
                                 file=f,
                                 language="ja",
                                 response_format="text",

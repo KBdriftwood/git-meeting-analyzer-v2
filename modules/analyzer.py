@@ -23,14 +23,15 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # ── AIバックエンド設定 ──────────────────────────────────────────────
-# "ollama"  → ローカル無料（要: ollama serve が起動していること）
+# "groq"    → Groq無料枠（要: GROQ_API_KEY）
 # "openai"  → OpenAI API（要: OPENAI_API_KEY）
-# "gemini"  → Google Gemini API（要: GEMINI_API_KEY）
-AI_BACKEND = os.getenv("AI_BACKEND", "openai")
+# "ollama"  → ローカル無料（要: ollama serve が起動していること）
+AI_BACKEND = os.getenv("AI_BACKEND", "groq")
 
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
 OLLAMA_MODEL    = os.getenv("OLLAMA_MODEL", "llama3.1")
 OPENAI_MODEL    = os.getenv("OPENAI_MODEL", "gpt-4o")
+GROQ_MODEL      = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
 
 _client: Optional[OpenAI] = None
 
@@ -38,10 +39,15 @@ _client: Optional[OpenAI] = None
 def _get_client() -> OpenAI:
     global _client
     if _client is None:
-        if AI_BACKEND == "ollama":
+        if AI_BACKEND == "groq":
+            _client = OpenAI(
+                base_url="https://api.groq.com/openai/v1",
+                api_key=os.getenv("GROQ_API_KEY"),
+            )
+        elif AI_BACKEND == "ollama":
             _client = OpenAI(
                 base_url=OLLAMA_BASE_URL,
-                api_key="ollama",  # Ollamaはキー不要だが形式上必要
+                api_key="ollama",
             )
         else:
             _client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -49,6 +55,8 @@ def _get_client() -> OpenAI:
 
 
 def _model_name() -> str:
+    if AI_BACKEND == "groq":
+        return GROQ_MODEL
     if AI_BACKEND == "ollama":
         return OLLAMA_MODEL
     return OPENAI_MODEL
